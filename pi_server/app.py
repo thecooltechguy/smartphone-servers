@@ -33,4 +33,4 @@ def devices_list():
     return jsonify(success=True, devices=[phone.to_json() for phone in datacenter_devices.values()])
 
 if __name__ == '__main__':
-    app.run()
+    app.run(host="0.0.0.0")
