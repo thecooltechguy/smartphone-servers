@@ -1,10 +1,11 @@
 import requests
 import time
 import threading
+import subprocess
 
 def register_device(url, id):
     print("Sending request to register device")
-    # hardcode the params for now, need to query the data using API
+    # hardcode the params for now
     params = {
         "id" : id, 
         "timestamp" : time.ctime()
@@ -14,7 +15,11 @@ def register_device(url, id):
 
 def send_heartbeat(url):
     print("Sending heartbeat")
-    # hardcode the params for now, need to query the data using API
+    '''
+    result = subprocess.Popen(["upower"], stdout = subprocess.PIPE)
+    output = (result.communicate())
+    '''
+    # hardcode the params for now
     params = {
         "timestamp" : time.ctime(),
         "system" : {
