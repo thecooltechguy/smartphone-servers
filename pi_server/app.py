@@ -3,6 +3,7 @@ from datetime import datetime
 from flask import Flask, request, jsonify
 
 from models import Phone
+import uuid
 
 app = Flask(__name__)
 
@@ -10,9 +11,11 @@ datacenter_devices = {}
 
 @app.route('/devices/register/', methods=['POST'])
 def register_device():
-    device = request.get_json()
-    datacenter_devices[device['id']] = Phone(id=device['id'])
-    return jsonify(success=True)
+    device_id = str(uuid.uuid4())
+    phone = Phone(id=device_id)
+    phone.metadata = request.get_json()
+    datacenter_devices[device_id] = phone
+    return jsonify(success=True, device_id=device_id)
 
 @app.route("/devices/<device_id>/heartbeat/", methods=['POST'])
 def device_heartbeat(device_id):

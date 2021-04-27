@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="BranchesTreeState">
+    <expand />
+    <select />
+  </component>
   <component name="ChangeListManager">
     <list default="true" id="a3f9d045-6949-40f4-b70d-8055496c48ac" name="Default Changelist" comment="">
       <change afterPath="$PROJECT_DIR$/.idea/.name" afterDir="false" />
@@ -38,6 +42,12 @@
     <property name="nodejs_npm_path_reset_for_default_project" value="true" />
     <property name="restartRequiresConfirmation" value="false" />
     <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
+  </component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/../smartphone-servers/pi_ifttt" />
+      <recent name="$PROJECT_DIR$/../smartphone-servers/pi_server" />
+    </key>
   </component>
   <component name="RunManager">
     <configuration default="true" type="DjangoTestsConfigurationType">
@@ -237,7 +247,7 @@
       <option name="presentableId" value="Default" />
       <updated>1619262782478</updated>
       <workItem from="1619262800673" duration="2135000" />
-      <workItem from="1619299111654" duration="237000" />
+      <workItem from="1619299111654" duration="374000" />
     </task>
     <servers />
   </component>
