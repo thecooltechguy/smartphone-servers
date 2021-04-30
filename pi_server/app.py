@@ -12,10 +12,15 @@ datacenter_devices = {}
 @app.route('/devices/register/', methods=['POST'])
 def register_device():
     device_id = str(uuid.uuid4())
-    phone = Phone(id=device_id)
+    smart_plug_key = request.form.get('smart_plug_key')
+
+    # if no key was added, then return false. They should provide a key for the smart plug
+    if smart_plug_key is None:
+        return jsonify(success=False, device_id=device_id, smart_plug_key="Please provide a key for the IFTTT smart plug.")
+    phone = Phone(id=device_id, key=smart_plug_key)
     phone.metadata = request.get_json()
     datacenter_devices[device_id] = phone
-    return jsonify(success=True, device_id=device_id)
+    return jsonify(success=True, device_id=device_id, smart_plug_key=smart_plug_key)
 
 @app.route("/devices/<device_id>/heartbeat/", methods=['POST'])
 def device_heartbeat(device_id):
@@ -29,6 +34,10 @@ def device_heartbeat(device_id):
 
     phone.last_heartbeat = datetime.utcnow()
     datacenter_devices[device_id] = phone
+
+    # TODO: need to add charging logic based on phone's battery level on heartbeat
+    # possibly something like phone.metadata.charge < 20 -> phone.start_charging() ...
+
     return jsonify(success=True)
 
 @app.route("/devices/")

@@ -1,13 +1,15 @@
 from datetime import datetime, timedelta
+import power
 
 # number of minutes in between heart beats that still considers the device is alive and healthy
 HEARTBEAT_ACTIVE_RANGE_MINUTES = 1
 
 class Phone:
-    def __init__(self, id):
+    def __init__(self, id, key):
         self.id = id
         self.last_heartbeat = None
         self.metadata = None
+        self.smart_plug_key = key
 
     @property
     def is_active(self):
@@ -22,3 +24,9 @@ class Phone:
             "is_active" : self.is_active,
             "metadata" : self.metadata
         }
+
+    def stop_charging(self):
+        power.power_off(self.smart_plug_key)
+        
+    def start_charging(self):
+        power.power_on(self.smart_plug_key)
