@@ -4,8 +4,13 @@ from flask import Flask, request, jsonify
 
 from models import Phone
 import uuid
+from socket_server import *
+
+PORT = 2222
 
 app = Flask(__name__)
+socketServer = SocketServer(PORT)
+socketServer.start()
 
 datacenter_devices = {}
 
@@ -20,6 +25,7 @@ def register_device():
     phone = Phone(id=device_id, key=smart_plug_key)
     phone.metadata = request.get_json()
     datacenter_devices[device_id] = phone
+
     return jsonify(success=True, device_id=device_id, smart_plug_key=smart_plug_key)
 
 @app.route("/devices/<device_id>/heartbeat/", methods=['POST'])
@@ -43,6 +49,16 @@ def device_heartbeat(device_id):
 @app.route("/devices/")
 def devices_list():
     return jsonify(success=True, devices=[phone.to_json() for phone in datacenter_devices.values()])
+
+
+@app.route("/devices/<device_id>/addTask/", methods=['POST'])
+def addTask(device_id):
+    if device_id not in datacenter_devices:
+        return jsonify(success=False), 400
+    socketServer.sendTask(device_id, Task("sick.com"))
+
+    return jsonify(success=True)
+
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0")
