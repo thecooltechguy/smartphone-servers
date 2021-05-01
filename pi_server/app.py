@@ -8,18 +8,9 @@ import uuid
 from flask_socketio import SocketIO, send, emit
 import random
 
-
-PORT = 2222
-
 app = Flask(__name__)
 app.config['SECRET_KEY'] = "actualsecret"
 socketio = SocketIO(app)
-
-# old socket server
-# from socket_server import *
-# socket server to communicate with phones
-# socketServer = SocketServer(PORT)
-# socketServer.start()
 
 datacenter_devices = {}
 
