@@ -93,7 +93,6 @@ Socket IO events:
 @socketio.on('connect')
 def test_connect():
     print("Phone has connected")
-    socketio.emit('my response', {'data': 'Connected'})
 
 @socketio.on('disconnect')
 def test_disconnect():
