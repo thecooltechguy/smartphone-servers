@@ -20,12 +20,13 @@ def disconnect():
 @sio.on("task_submission")
 def task_submission(data):
     # Check if this is for this deviceid
-    print("Device ID:", data['device_id'])
+    if device_id != data['device_id']:
+        return
     
-    # add task
-    print('Task Github Link: ', data['github_link'])
+    # TODO: now we've obtained the link, now do something with it
+    print('Working on Github Link: ', data['github_link'])
 
-    sio.emit('task_acknowledgement', {'response': 'my response'})
+    sio.emit('task_acknowledgement', {'device_id': device_id, 'response': 'Obtained task, now starting on it.'})
 
 sio.connect('http://localhost:5000')
 sio.wait()
