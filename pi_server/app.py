@@ -9,6 +9,8 @@ from socket_server import *
 PORT = 2222
 
 app = Flask(__name__)
+
+# socket server to communicate with phones
 socketServer = SocketServer(PORT)
 socketServer.start()
 

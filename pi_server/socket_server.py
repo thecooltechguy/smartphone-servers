@@ -24,6 +24,7 @@ class SocketServer(threading.Thread):
         self.stop = False
         print(port)
 
+        # separate thread will handle sending the tasks to the phones, the flask server just needs to call sendTask()
         threading.Thread(target = self.handleSendingTasks).start()
         
     def run(self):
@@ -52,7 +53,19 @@ class SocketServer(threading.Thread):
             # update the socket variable for this device id.
             self.device_sockets[device_id] = conn
 
-    # A separate thread will handle sending tasks to the different phones connected via socket
+    # the raspberry pi will call this with the device id to send a task to the phone
+    def sendTask(self, device_id, task):
+        if device_id not in self.device_tasks:
+            print("No device ID for addTask")
+            return
+        self.device_tasks[device_id].append(task)
+    
+    # used to stop the pi from sending data
+    def stop(self):
+        self.stop = True
+
+ 
+    ### A separate thread will handle sending tasks to the different phones connected via socket ###
     def handleSendingTasks(self):
         while True:
             if not stop:
@@ -68,14 +81,3 @@ class SocketServer(threading.Thread):
                 time.sleep(10)
             else:
                 return
-
-    # the raspberry pi will call this with the device id to send a task to the phone
-    def sendTask(self, device_id, task):
-        if device_id not in self.device_tasks:
-            print("No device ID for addTask")
-            return
-        self.device_tasks[device_id].append(task)
-    
-    # used to stop the pi from sending data
-    def stop(self):
-        self.stop = True
