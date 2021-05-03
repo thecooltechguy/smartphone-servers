@@ -12,7 +12,8 @@ This request would be made from the smartphones
 curl --location --request POST 'http://127.0.0.1:5000/devices/register/' \
 --header 'Content-Type: application/json' \
 --data-raw '{
-    "id" : "dev1"
+    "id" : "dev1",
+    "smart_plug_key" : "<insert IFTTT key here>"
 }'
 ```
 
@@ -165,6 +166,15 @@ Example response:
     "success": true
 }
 ```
+
+## Setting up Wyze Smart Plug
+1. Create a Wyze account and connect the smart plug to your account
+2. Create a IFTTT account and connect your Wyze account to it
+3. Create two IFTTT applets
+    - Applet 1: If webhook with "battery_low" event, then turn on the smart plug.
+    - Applet 2: If webhook with "battery_high" event, then turn off the smart plug.
+4. Find your URL key: https://ifttt.com/maker_webhooks/ and click on Documentation.
+5. Use your URL key to register the device through the pi_server
 
 # TODO
 - Need to store devices & state in a DB, not in memory
