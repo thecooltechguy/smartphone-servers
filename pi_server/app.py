@@ -3,7 +3,7 @@ from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO, send, emit
 
-from pi_server import db
+import db
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = "actualsecret"
@@ -105,7 +105,7 @@ def job_update_status(job_id):
 
 @app.before_request
 def before_request():
-    db.db.connect()
+    db.db.connect(reuse_if_open=True)
 
 @app.after_request
 def after_request(response):
