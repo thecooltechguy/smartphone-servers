@@ -1,31 +1,47 @@
 # Quickstart
+## Install python dependencies for the server
+```shell script
+pip install -r requirements.txt
+```
 
-## Run the backend API server
+## Create the database
+**Note:** Only the first time the server is run on a new Pi
+```shell script
+python create_db.py
+```
+After running this command, a `database.db` file should be created in the current folder (`pi_server`).
+
+## Start the backend API server
 ```shell script
 python app.py
 ```
 
-## Test commands
+## MVP workflow
 ### Register a new device
-This request would be made from the smartphones
 ```shell script
-curl --location --request POST 'http://127.0.0.1:5000/devices/register/' \
---header 'Content-Type: application/json' \
---data-raw '{
-    "id" : "dev1",
-    "smart_plug_key" : "<insert IFTTT key here>"
-}'
+cd ../tests # go to the tests/ folder
+python test_socketio_phone.py
 ```
 
-Example response:
-```json
-{
-    "success": true
-}
+This script will register a new device with the server and will open a real-time socket communication with the server.
+Ideally, this script (or rather, the main logic from this script) would be run from the phone to register itself and listen for jobs
+
+### Submit a new task
+```shell script
+cd ../tests # go to the tests/ folder
+python test_send_task.py
 ```
 
-### List all devices
-Note that the registered device will first be inactive until it receives the first heartbeat (with all the metadata info, etc.)
+This script will submit a new task (with the job's code URL being `https://github.com/jfswitzer/ut_test.git`) to the Pi server.
+Once this is done, go back to the terminal running the `test_socketio_phone.py` script process.
+You should see this "device" receive the job, work on it (for 5 secs), and then update the server saying that the job has finished.
+
+Be sure to checkout the `test_socketio_phone.py` file's code to see the actual code/requests logic for receiving jobs and sending updates on the jobs (such as when they succeed/fail, etc.)
+
+### View jobs and devices
+At any point in this workflow, you can always view all devices and jobs with the following cURL commands:
+
+#### Devices
 ```shell script
 curl --location --request GET 'http://127.0.0.1:5000/devices/'
 ```
@@ -33,15 +49,47 @@ curl --location --request GET 'http://127.0.0.1:5000/devices/'
 Example response:
 ```json
 {
-    "devices": [
-        {
-            "id": "dev1",
-            "is_active": false,
-            "last_heartbeat": "2021-04-24 11:29:39.252261",
-            "metadata": {}
-        }
-    ],
-    "success": true
+  "devices": [
+    {
+      "assigned_jobs": {
+        "num_total": 0
+      }, 
+      "id": 1, 
+      "last_heartbeat": "2021-05-04 00:40:19.647478", 
+      "metadata": {}, 
+      "smart_plug_key": "random_key", 
+      "time_created": "2021-05-04 00:40:19.647330", 
+      "time_updated": "2021-05-04 00:40:19.647498"
+    }
+  ], 
+  "success": true
+}
+```
+
+#### Jobs
+```shell script
+curl --location --request GET 'http://127.0.0.1:5000/jobs/'
+```
+
+Example response:
+```json
+{
+  "jobs": [
+    {
+      "assigned_device_id": null, 
+      "code_url": "https://github.com/jfswitzer/ut_test.git", 
+      "id": 1, 
+      "resource_requirements": {
+        "cpus": -1, 
+        "max_runtime_secs": -1, 
+        "memory_mb": -1
+      }, 
+      "status": 3, 
+      "time_created": "2021-05-04 00:40:21.467057", 
+      "time_updated": "2021-05-04 00:40:26.487776"
+    }
+  ], 
+  "success": true
 }
 ```
 
@@ -66,107 +114,6 @@ Example response:
 }
 ```
 
-### List all devices
-The registered device will now be shown as active (and will remain active for the next 1 minute, while no further heartbeat is sent)
-```shell script
-curl --location --request GET 'http://127.0.0.1:5000/devices/'
-```
-
-Example response:
-```json
-{
-    "devices": [
-        {
-            "id": "dev1",
-            "is_active": true,
-            "last_heartbeat": "2021-04-24 11:29:39.252261",
-            "metadata": {
-                "system": {
-                    "cpu": 0.8,
-                    "memory": 16
-                }
-            }
-        }
-    ],
-    "success": true
-}
-```
-
-### Wait for 1 minute
-After this time period, the device becomes inactive again in our backend server
-
-### List all devices
-Ensure that the device is now inactive (the `is_active` field should be set to `false` now)
-```shell script
-curl --location --request GET 'http://127.0.0.1:5000/devices/'
-```
-
-Example response:
-```json
-{
-    "devices": [
-        {
-            "id": "dev1",
-            "is_active": false,
-            "last_heartbeat": "2021-04-24 11:29:39.252261",
-            "metadata": {
-                "system": {
-                    "cpu": 0.8,
-                    "memory": 16
-                }
-            }
-        }
-    ],
-    "success": true
-}
-```
-
-### Send another heartbeat
-```shell script
-curl --location --request POST 'http://127.0.0.1:5000/devices/dev1/heartbeat/' \
---header 'Content-Type: application/json' \
---data-raw '{
-    "system" : {
-        "cpu" : 0.8,
-        "memory" : 16
-    }
-}'
-```
-
-Example response:
-```json
-{
-    "success": true
-}
-```
-
-### List all devices
-Now, the device's status should be active again.
-
-```shell script
-curl --location --request GET 'http://127.0.0.1:5000/devices/'
-```
-
-Example response:
-```json
-{
-    "devices": [
-        {
-            "id": "dev1",
-            "is_active": true,
-            "last_heartbeat": "2021-04-24 11:29:39.252261",
-            "metadata": {
-                "system": {
-                    "cpu": 0.8,
-                    "memory": 16
-                }
-            }
-        }
-    ],
-    "success": true
-}
-```
-
 ## Setting up Wyze Smart Plug
 1. Create a Wyze account and connect the smart plug to your account
 2. Create a IFTTT account and connect your Wyze account to it
@@ -175,6 +122,3 @@ Example response:
     - Applet 2: If webhook with "battery_high" event, then turn off the smart plug.
 4. Find your URL key: https://ifttt.com/maker_webhooks/ and click on Documentation.
 5. Use your URL key to register the device through the pi_server
-
-# TODO
-- Need to store devices & state in a DB, not in memory

@@ -11,6 +11,8 @@ class BaseModel(Model):
 class Device(BaseModel):
     metadata = JSONField()
 
+    smart_plug_key = TextField()
+
     time_created = DateTimeField(default=datetime.datetime.utcnow)
     last_heartbeat = DateTimeField(default=datetime.datetime.utcnow)
     time_updated = DateTimeField()
@@ -27,7 +29,9 @@ class Device(BaseModel):
             "time_updated" : str(self.time_updated),
             "assigned_jobs" : {
                 "num_total" : len(self.assigned_jobs)
-            }
+            },
+            "smart_plug_key" : self.smart_plug_key,
+            "metadata" : self.metadata
         }
 
 
@@ -38,8 +42,7 @@ class Job(BaseModel):
     SUCCEEDED = 3
 
     status = IntegerField(choices=[(UNASSIGNED, "UNASSIGNED"), (ASSIGNED, "ASSIGNED"), (FAILED, "FAILED"), (SUCCEEDED, "SUCCESS")], default=0)
-
-    assigned_device = ForeignKeyField(Device, backref="assigned_jobs")
+    assigned_device = ForeignKeyField(Device, backref="assigned_jobs", null=True, default=None)
 
     # Resource limits
     # -1 means no limit
@@ -61,7 +64,7 @@ class Job(BaseModel):
         return {
             "id" : self.id,
             "status" : self.status,
-            "assigned_device_id" : self.assigned_device.id,
+            "assigned_device_id" : None if not self.assigned_device else self.assigned_device.id,
             "resource_requirements" : {
                 "cpus" : self.cpus,
                 "memory_mb" : self.memory_mb,
@@ -73,8 +76,8 @@ class Job(BaseModel):
         }
 
 
-def create_device(metadata):
-    device = Device(metadata=metadata)
+def create_device(smart_plug_key, metadata):
+    device = Device(smart_plug_key=smart_plug_key, metadata=metadata)
     device.save()
     return device.id
 
@@ -86,18 +89,29 @@ def create_job(job_spec):
               max_runtime_secs=job_spec.get("max_runtime_secs", -1),
               code_url = job_spec['code_url'])
     job.save()
-    return job.id
+    return job
 
 def get_device(device_id):
-    device = Device.get(Device.id == device_id)
-    return device
+    try:
+        return Device.get(Device.id == device_id)
+    except:
+        return None
+
+def get_devices_not_currently_in_use():
+    # TODO: A more optimized query would involve JOINS, but for now, we're doing it the naive way
+    return [device for device in get_all_devices() if len(device.assigned_jobs) == 0]
 
 def get_all_devices():
     return list(Device.select())
 
+def get_all_jobs():
+    return list(Job.select())
+
 def get_job(job_id):
-    job = Job.get(Job.id == job_id)
-    return job
+    try:
+        return Job.get(Job.id == job_id)
+    except:
+        return None
 
 def update_device(device_id, metadata):
     device = get_device(device_id=device_id)

@@ -1,15 +1,23 @@
 from datetime import datetime
 
 from flask import Flask, request, jsonify
+from flask_socketio import SocketIO, send, emit
 
 from pi_server import db
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = "actualsecret"
+socketio = SocketIO(app)
 
+# TODO: Flesh out all API code to properly format and return errors as json responses
 @app.route('/devices/register/', methods=['POST'])
 def register_device():
     metadata = request.get_json()
-    device_id = db.create_device(metadata=metadata)
+    smart_plug_key = metadata.pop("smart_plug_key")
+    if not smart_plug_key:
+        return jsonify(success=False, error_code="MISSING_DEVICE_SMART_PLUG_KEY"), 400
+
+    device_id = db.create_device(smart_plug_key=smart_plug_key, metadata=metadata)
     return jsonify(success=True, device_id=device_id)
 
 
@@ -22,13 +30,20 @@ def device_heartbeat(device_id):
     # metadata stores a json object of arbitrary device related data (such as battery life, cpu mem, etc.)
     device.metadata = request.get_json()
     device.last_heartbeat = datetime.utcnow()
-
     device.save()
+
+    # TODO: need to add charging logic based on phone's battery level on heartbeat
+    # possibly something like phone.metadata.charge < 20 -> phone.start_charging() ...
+
     return jsonify(success=True)
 
 @app.route("/devices/")
 def devices_list():
     return jsonify(success=True, devices=[device.to_json() for device in db.get_all_devices()])
+
+@app.route("/jobs/")
+def jobs_list():
+    return jsonify(success=True, jobs=[job.to_json() for job in db.get_all_jobs()])
 
 @app.route("/jobs/submit/", methods=['POST'])
 def job_submit():
@@ -37,6 +52,22 @@ def job_submit():
     assert "code_url" in body
 
     job = db.create_job(job_spec=body)
+
+    # Choose a device to send this job to
+    # TODO: Add some sort of cron/redundancy to attempt to re-assign jobs that don't get acknowledged, etc.
+    #  This should occur as some sort of cron process, but for the sake of an MVP, we just try to assign each job once
+
+    # Choose a device id that currently doesn't have any assigned jobs
+    # TODO: This logic would of course change once we begin to account for cpus/mem, at which point,
+    #  the device selection query would select all devices that have enough resources to run this job, etc.
+    devices_not_in_use = db.get_devices_not_currently_in_use()
+    if not devices_not_in_use:
+        return jsonify(success=False, error_code="ALL_DEVICES_ARE_BUSY"), 500
+
+    # For now, just simply pick the first device that's not in use
+    target_device_id = devices_not_in_use[0].id
+    socketio.emit("task_submission", {'device_id': target_device_id, 'job': job.to_json()})
+
     return jsonify(success=True, job_id=job.id)
 
 @app.route("/jobs/<job_id>/update_status/", methods=['POST'])
@@ -51,22 +82,25 @@ def job_update_status(job_id):
 
     device = db.get_device(device_id)
     if not device:
-        return jsonify(success=False), 400
+        return jsonify(success=False, error_code="INVALID_DEVICE_ID"), 400
 
     job = db.get_job(job_id)
     if not job:
-        return jsonify(success=False), 400
+        return jsonify(success=False, error_code="INVALID_JOB_ID"), 400
 
-    if status == "ack" and job.status != db.Job.UNASSIGNED:
-        return jsonify(success=False, error_code="JOB_NOT_UNASSIGNED")
+    if not job.assigned_device:
+        return jsonify(success=False, error_code="CANNOT_UPDATE_UNASSIGNED_JOB")
 
-    if job.assigned_device and job.assigned_device.id != device_id:
-        return jsonify(success=False, error_code="JOB_ASSIGNED_TO_ANOTHER_DEVICE")
+    if job.assigned_device.id != device_id:
+        return jsonify(success=False, error_code="JOB_ASSIGNED_TO_ANOTHER_DEVICE"), 400
 
     job.status = status
-    job.assigned_device = device
-    job.save()
 
+    if status == db.Job.SUCCEEDED or status == db.Job.FAILED:
+        # This job has finished, so it's no longer assigned to a device
+        job.assigned_device = None
+
+    job.save()
     return jsonify(success=True)
 
 @app.before_request
@@ -78,7 +112,37 @@ def after_request(response):
     db.db.close()
     return response
 
+'''
+Socket IO events:
+ - connect
+ - disconnect
+ - receive ACK from phones
+'''
+@socketio.on('connect')
+def test_connect():
+    device_id = request.args.get("device_id")
+    device = db.get_device(device_id=device_id)
+    if not device:
+        # Unknown device tried to connect
+        return False
+    print(f"Device id={device_id} has connected")
+
+@socketio.on('disconnect')
+def test_disconnect():
+    print('A device has disconnected')
+
+@socketio.on('task_acknowledgement')
+def handle_phone_response(data):
+    device_id = data['device_id']
+    job_id = data['job_id']
+
+    job = db.get_job(job_id=job_id)
+    job.status = db.Job.ASSIGNED
+    job.assigned_device = device_id
+    job.save()
+
+    print (f"Device id={device_id} has acknowledged job id={job_id}")
+
 if __name__ == '__main__':
-    with db.db:
-        db.db.create_tables([db.Device, db.Job])
-    app.run(host="0.0.0.0")
+    # app.run(host="0.0.0.0")
+    socketio.run(app, host='0.0.0.0')

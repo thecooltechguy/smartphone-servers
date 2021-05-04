@@ -1,8 +1,12 @@
 import requests
+SERVER_ENDPOINT = "http://localhost:5000"
 
-add_task_url = "http://192.168.0.113:5000/devices/addTask/"
+submit_job_url = f"{SERVER_ENDPOINT}/jobs/submit/"
 
-data = {"github_link": "https://github.com/jfswitzer/ut_test.git"}
+job_spec = {
+    "code_url": "https://github.com/jfswitzer/ut_test.git",
+    "resource_requirements" : {} # TODO: Later, when we add support for resource_requirements, test some real values for this
+}
 
-y = requests.post(add_task_url, data=data)
-print(y.text)
+resp = requests.post(submit_job_url, json=job_spec).json()
+print(resp)
