@@ -30,3 +30,12 @@ class Phone:
         
     def start_charging(self):
         power.power_on(self.smart_plug_key)
+
+    def get_battery_level(self):
+        return self.metadata['system']['battery']
+
+    def needs_to_start_charging(self):
+        return self.get_battery_level() < 0.2
+
+    def needs_to_stop_charging(self):
+        return self.get_battery_level() > 0.8

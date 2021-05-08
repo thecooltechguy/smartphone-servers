@@ -34,6 +34,10 @@ def device_heartbeat(device_id):
 
     # TODO: need to add charging logic based on phone's battery level on heartbeat
     # possibly something like phone.metadata.charge < 20 -> phone.start_charging() ...
+    if device.needs_to_start_charging():
+        device.start_charging()
+    elif device.needs_to_stop_charging():
+        device.stop_charging()
 
     return jsonify(success=True)
 
