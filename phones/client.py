@@ -6,6 +6,7 @@ import os
 SERVER_ENDPOINT = "http://localhost:5000"
 STATUS_FAILED = 2
 STATUS_SUCCEDED = 3
+
 # get the device id
 device_id = None
 with open("./id.txt", "r") as f:
@@ -31,7 +32,7 @@ def task_submission(data):
 
     sio.emit('task_acknowledgement', {'device_id': device_id, 'job_id' : job_id})
 
-    print(f'Working on job id={job_id}: ')
+    print('Working on job id={}: '.format(job_id))
     print(data['job'])
 
     # process the task from git repo
@@ -51,9 +52,9 @@ def task_submission(data):
     status = STATUS_SUCCEDED # or, STATUS_FAILED
     
     # TODO: how do we return the response
-    resp = requests.post(f"{SERVER_ENDPOINT}/jobs/{job_id}/update_status/", json={"device_id" : device_id, "status" : status, "result" : result}).json()
+    resp = requests.post("{}/jobs/{}/update_status/".format(SERVER_ENDPOINT, job_id), json={"device_id" : device_id, "status" : status, "result" : result}).json()
 
-    print(f"Response from notifying server of job status: {status}")
+    print("Response from notifying server of job status: {}".format(status))
     print(resp)
 
 def process_git_task(url):
@@ -66,5 +67,5 @@ def process_git_task(url):
     # remove the git repo
     os.system('rm -rf {}'.format(directory))
 
-sio.connect(f'http://127.0.0.1:5000/?device_id={device_id}')
+sio.connect('http://127.0.0.1:5000/?device_id={}'.format(device_id))
 sio.wait()
