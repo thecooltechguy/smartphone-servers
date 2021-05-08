@@ -17,5 +17,3 @@ def disk_use():
 def temp():
     #todo - fill in (device-specific)
     psutil.sensors_temperatures()
-
-print(disk_use())

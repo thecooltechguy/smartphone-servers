@@ -35,12 +35,14 @@ def send_heartbeat():
     params = {
         "timestamp" : time.ctime(),
         "system" : {
-            "cpu" : util.cpu_use(),
-            "battery": util.battery_level(),
-            "disk": util.disk_use(),
-            "pluggedin": util.plugged_in()
+            "cpu" : 0.6,
+            "memory": 16,
         }
     }
+    #util.cpu_use(),
+    #        "battery": util.battery_level(),
+    #        "disk": util.disk_use(),
+    #        "pluggedin": util.plugged_in()
     url = "http://0.0.0.0:5000/devices/{}/heartbeat/".format(id)
     resp = requests.post(url, json = params)
     if resp.status_code == 400:
