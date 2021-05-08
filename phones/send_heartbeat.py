@@ -1,7 +1,6 @@
 import requests
 import time
 import threading
-import subprocess
 import util
 
 def register_device():
