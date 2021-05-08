@@ -7,19 +7,20 @@ def register_device():
     url = "http://0.0.0.0:5000/devices/register/"
     # hardcode the params for now
     params = {
-        "timestamp" : time.ctime()
+        "timestamp" : time.ctime(),
+        "smart_plug_key": "key"
     }
     resp = requests.post(url, json = params)
     if resp.status_code != 200:
         print("Unsuccessful Request")
+        return
     
     id = resp.json()['device_id']
     # store the device id locally in a file
     with open("./id.txt", "w") as f:
-        f.write(id)
+        f.write(str(id))
 
 def send_heartbeat():
-    print("Sending heartbeat")
     # get the device id
     id = None
     with open("./id.txt", "r") as f:
@@ -43,8 +44,6 @@ def send_heartbeat():
         register_device()
         resp = requests.post(url, json = params)
     
-    print(resp.status_code)
-
     # send a heartbeat every 60 seconds
     threading.Timer(60, send_heartbeat).start()
 

@@ -1,4 +1,14 @@
 import socketio
+import time
+import requests
+
+SERVER_ENDPOINT = "http://localhost:5000"
+STATUS_FAILED = 2
+STATUS_SUCCEDED = 3
+# get the device id
+device_id = None
+with open("./id.txt", "r") as f:
+    device_id = int(f.readline())
 
 sio = socketio.Client()
 
@@ -32,5 +42,5 @@ def task_submission(data):
     print (f"Response from notifying server of job status: {status}")
     print(resp)
 
-sio.connect("http://0.0.0.0:5000", namespaces=['/task_acknowledgement'])
+sio.connect(f'http://127.0.0.1:5000/?device_id={device_id}')
 sio.wait()
