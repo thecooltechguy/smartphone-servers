@@ -1,52 +1,36 @@
-import requests
-import time
-import threading
-import subprocess
+import socketio
 
-def register_device():
-    url = "http://0.0.0.0:5000/devices/register/"
-    # hardcode the params for now
-    params = {
-        "timestamp" : time.ctime()
-    }
-    resp = requests.post(url, json = params)
-    if resp.status_code != 200:
-        print("Unsuccessful Request")
-    
-    id = resp.json()['device_id']
-    # store the device id locally in a file
-    with open("./id.txt", "w") as f:
-        f.write(id)
+sio = socketio.Client()
 
-def send_heartbeat():
-    print("Sending heartbeat")
-    # get the device id
-    id = None
-    with open("./id.txt", "r") as f:
-        id = f.readline()
-    
-    '''
-    result = subprocess.Popen(["upower"], stdout = subprocess.PIPE)
-    output = (result.communicate())
-    '''
-    # hardcode the params for now
-    params = {
-        "timestamp" : time.ctime(),
-        "system" : {
-            "cpu" : 0.8,
-            "memory" : 16 
-        }
-    }
-    url = "http://0.0.0.0:5000/devices/{}/heartbeat/".format(id)
-    resp = requests.post(url, json = params)
-    if resp.status_code == 400:
-        register_device()
-        resp = requests.post(url, json = params)
-    
-    print(resp.status_code)
+@sio.event
+def connect():
+    print('connection established')
 
-    # send a heartbeat every 60 seconds
-    threading.Timer(60, send_heartbeat).start()
+@sio.event
+def disconnect():
+    print('disconnected from server')
 
-register_device()
-send_heartbeat()
+@sio.on("task_submission")
+def task_submission(data):
+    # Check if this is for this deviceid
+    if device_id != data['device_id']:
+        return
+
+    job_id = data['job']['id']
+
+    sio.emit('task_acknowledgement', {'device_id': device_id, 'job_id' : job_id})
+
+    print(f'Working on job id={job_id}: ')
+    print(data['job'])
+
+    time.sleep(5)
+
+    # Once the job succeeds/fails, notify the server
+    status = STATUS_SUCCEDED # or, STATUS_FAILED
+    resp = requests.post(f"{SERVER_ENDPOINT}/jobs/{job_id}/update_status/", json={"device_id" : device_id, "status" : status}).json()
+
+    print (f"Response from notifying server of job status: {status}")
+    print(resp)
+
+sio.connect("http://0.0.0.0:5000", namespaces=['/task_acknowledgement'])
+sio.wait()
