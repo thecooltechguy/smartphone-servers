@@ -2,6 +2,7 @@ import requests
 import time
 import threading
 import subprocess
+import util
 
 def register_device():
     url = "http://0.0.0.0:5000/devices/register/"
@@ -34,8 +35,10 @@ def send_heartbeat():
     params = {
         "timestamp" : time.ctime(),
         "system" : {
-            "cpu" : 0.8,
-            "memory" : 16 
+            "cpu" : util.cpu_use(),
+            "battery": util.battery_level(),
+            "disk": util.disk_use(),
+            "pluggedin": util.plugged_in()
         }
     }
     url = "http://0.0.0.0:5000/devices/{}/heartbeat/".format(id)
