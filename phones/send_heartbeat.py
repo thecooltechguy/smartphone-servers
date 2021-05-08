@@ -36,7 +36,8 @@ def send_heartbeat():
         "timestamp" : time.ctime(),
         "system" : {
             "cpu" : 0.6,
-            "memory": 16,
+            "battery": 0.82,
+            
         }
     }
     #util.cpu_use(),
