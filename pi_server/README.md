@@ -23,15 +23,14 @@ cd ../phones # go to the phones/ folder
 python send_heartbeat.py &
 ```
 
-This script will register a new device with the server and will send heartbeat to the server every 60 seconds.
-Ideally, this script (or rather, the main logic from this script) would be run from the phone to register itself and listen for jobs
+This script will register a new device with the server and will send heartbeat to the server every 60 seconds in teh background. This script should be run from the phone.
 
 ### Open a socket
 ```shell script
 cd ../phones # go to the phones/ folder
 python client.py
 ```
-This script will register a new device with the server and will open a real-time socket communication with the server. Ideally, this script (or rather, the main logic from this script) would be run from the phone to register itself and listen for jobs
+This script will register a new device with the server and will open a real-time socket communication with the server. This script should be run form the phone.
 
 ### Register a new device
 ```shell script
