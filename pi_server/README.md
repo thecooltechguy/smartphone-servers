@@ -19,14 +19,21 @@ python app.py
 ## MVP workflow
 ### Register a new device
 ```shell script
-cd ../tests # go to the tests/ folder
-python test_socketio_phone.py
+cd ../phones # go to the phones/ folder
+python send_heartbeat.py &
 ```
 
-This script will register a new device with the server and will open a real-time socket communication with the server.
+This script will register a new device with the server and will send heartbeat to the server every 60 seconds.
 Ideally, this script (or rather, the main logic from this script) would be run from the phone to register itself and listen for jobs
 
-### Submit a new task
+### Open a socket
+```shell script
+cd ../phones # go to the phones/ folder
+python client.py
+```
+This script will register a new device with the server and will open a real-time socket communication with the server. Ideally, this script (or rather, the main logic from this script) would be run from the phone to register itself and listen for jobs
+
+### Register a new device
 ```shell script
 cd ../tests # go to the tests/ folder
 python test_send_task.py
