@@ -19,12 +19,18 @@ python app.py
 ## MVP workflow
 ### Register a new device
 ```shell script
-cd ../tests # go to the tests/ folder
-python test_socketio_phone.py
+cd ../phones # go to the phones/ folder
+python send_heartbeat.py &
 ```
 
-This script will register a new device with the server and will open a real-time socket communication with the server.
-Ideally, this script (or rather, the main logic from this script) would be run from the phone to register itself and listen for jobs
+This script will register a new device with the server and will send heartbeat to the server every 60 seconds in the background. This script should be run from the phone.
+
+### Open a socket
+```shell script
+cd ../phones # go to the phones/ folder
+python client.py
+```
+This script will register a new device with the server and will open a real-time socket communication with the server. This script should be run form the phone.
 
 ### Submit a new task
 ```shell script
@@ -36,7 +42,7 @@ This script will submit a new task (with the job's code URL being `https://githu
 Once this is done, go back to the terminal running the `test_socketio_phone.py` script process.
 You should see this "device" receive the job, work on it (for 5 secs), and then update the server saying that the job has finished.
 
-Be sure to checkout the `test_socketio_phone.py` file's code to see the actual code/requests logic for receiving jobs and sending updates on the jobs (such as when they succeed/fail, etc.)
+Be sure to checkout the `client.py` file's code to see the actual code/requests logic for receiving jobs and sending updates on the jobs (such as when they succeed/fail, etc.)
 
 ### View jobs and devices
 At any point in this workflow, you can always view all devices and jobs with the following cURL commands:

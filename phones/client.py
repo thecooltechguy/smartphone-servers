@@ -43,12 +43,14 @@ def task_submission(data):
     with open("./output", "r") as f:
         result += f.readline()
     
+    print(result)
+
     time.sleep(5)
 
     # Once the job succeeds/fails, notify the server
     status = STATUS_SUCCEDED # or, STATUS_FAILED
     
-    # TODO: sending the response
+    # TODO: how do we return the response
     resp = requests.post(f"{SERVER_ENDPOINT}/jobs/{job_id}/update_status/", json={"device_id" : device_id, "status" : status, "result" : result}).json()
 
     print(f"Response from notifying server of job status: {status}")
