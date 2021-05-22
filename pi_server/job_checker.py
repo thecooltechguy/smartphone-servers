@@ -39,10 +39,9 @@ class JobChecker:
                         device.num_failed_jobs += 1
                         device.save()
 
-                        print(device.num_failed_jobs)
-                        print("Timed out job on", device.id, "on Job", job.id)
+                        print("[JOB TIMEOUT]: Device", device.id, "on Job", job.id)
 
-                        cancel_and_reschedule_job(job.id)
+                        self.cancel_and_reschedule_job(job.id)
 
                 # Check if the phone has not acknowledged the job for 10 seconds. If so, then increase the num_failed_acks and reschedule the job
                 if job_json["status"] == job.UNASSIGNED:
@@ -55,8 +54,7 @@ class JobChecker:
                         device.num_failed_acks += 1
                         device.save()
 
-                        print(device.num_failed_acks)
-                        print("No acknowledgement from", device.id, "on Job", job.id)
+                        print("[NO DEVICE ACK]: Device", device.id, "on Job", job.id)
 
                         self.remove_pending_acknowledgement(job.id)
                         self.cancel_and_reschedule_job(job.id)
@@ -88,7 +86,7 @@ class JobChecker:
         job.assigned_device_id = None 
         job.save()
 
-        print("Job #", job.id, "cancelled and rescheduled.")
+        print(f"[JOB {job.id}] cancelled and rescheduled.")
 
         # Reschedule the job for another device, if and only if the number of retries don't go past 3.
         if job_json["num_rescheduled"] < 3:
@@ -99,4 +97,9 @@ class JobChecker:
             }
             # rescheduled_job = create_job(rescheduled_job_spec)
             resp = requests.post(submit_job_url, json=rescheduled_job_spec).json()
-            print("Response from rescheduling timed out job: ", resp)
+            if(resp["success"]):
+                new_job_id = resp["job_id"]
+                print(f"[JOB {job.id} --(rescheduled)--> JOB {new_job_id}]")
+            else:
+                print(f"[JOB {job.id} RESCHEDULE FAILURE]")
+

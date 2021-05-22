@@ -76,8 +76,8 @@ def job_submit():
         if device.num_failed_acks + device.num_failed_jobs < min_failed_count:
             target_device_id = device.id
             min_failed_count = device.num_failed_acks + device.num_failed_jobs
-
-
+    
+    print("[JOB ASSIGNMENT] Job", job.id, "to device", target_device_id)
     socketio.emit("task_submission", {'device_id': target_device_id, 'job': job.to_json()})
 
     # used to make sure that the phone eventually acknowledges it, if not then we reschedule the job
