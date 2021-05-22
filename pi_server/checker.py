@@ -7,23 +7,24 @@ import datetime
 
 SERVER_ENDPOINT = "http://localhost:5000"
 submit_job_url = f"{SERVER_ENDPOINT}/jobs/submit/"
+MAX_FAILS = 100
 
-# JobChecker 
+# Checker 
 # 1. checks each job to see if they time out
 # 2. if job times out, restart it
 # 3. if job repeatedly fails, then stop it after 3 retries
 # 4. if phone does not acknowledge task, increment its failed acks num
-class JobChecker:
+class Checker:
 
     def __init__(self):
         self.stopped = False
         self.pending_job_acks = {}
 
-    def check_job(self):
+    def check(self):
         while not self.stopped:
             jobs = db.get_all_jobs()
 
-            # for each job...
+            # ==== for each job ====
             for job in jobs:
                 job_json = job.to_json()
                 job_max_secs = job_json["resource_requirements"]["max_runtime_secs"]
@@ -60,13 +61,24 @@ class JobChecker:
                         self.cancel_and_reschedule_job(job.id)
 
 
+            # ==== END of "for each job" section ====
+
+            # ==== Check devices' num failed counts ====
+            for device in db.get_all_devices():
+                if device.num_failed_acks + device.num_failed_jobs > MAX_FAILS:
+                    device.stop_charging()
+                    device.decommissioned = True
+                if device.needs_to_start_charging():
+                    device.start_charging()
+                elif device.needs_to_stop_charging():
+                    device.stop_charging()
                 
 
     def stop(self):
         self.stopped = True
 
     def run(self):
-        t1 = threading.Thread(target=self.check_job)
+        t1 = threading.Thread(target=self.check)
         t1.start()
 
     def add_pending_acknowledgement(self, job_id, device_id):

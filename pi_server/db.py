@@ -1,6 +1,7 @@
 from peewee import *
 from playhouse.sqlite_ext import *
 import datetime
+import power
 
 db = SqliteDatabase('database.db')
 
@@ -19,6 +20,8 @@ class Device(BaseModel):
 
     num_failed_jobs = IntegerField(default=0)
     num_failed_acks = IntegerField(default=0)
+
+    decommissioned = BooleanField(default=False)
 
     def save(self, *args, **kwargs):
         self.time_updated = datetime.datetime.utcnow()
@@ -39,6 +42,21 @@ class Device(BaseModel):
             "num_failed_acks": self.num_failed_acks
         }
 
+
+    def stop_charging(self):
+        power.power_off(self.smart_plug_key)
+        
+    def start_charging(self):
+        power.power_on(self.smart_plug_key)
+
+    def get_battery_level(self):
+        return self.metadata['system']['battery']
+
+    def needs_to_start_charging(self):
+        return self.get_battery_level() < 0.2
+
+    def needs_to_stop_charging(self):
+        return self.get_battery_level() > 0.8
 
 class Job(BaseModel):
     UNASSIGNED = 0
@@ -108,7 +126,7 @@ def get_device(device_id):
 
 def get_devices_not_currently_in_use():
     # TODO: A more optimized query would involve JOINS, but for now, we're doing it the naive way
-    return [device for device in get_all_devices() if len(device.assigned_jobs) == 0]
+    return [device for device in get_all_devices() if len(device.assigned_jobs) == 0 and device.decommissioned == False]
 
 def get_all_devices():
     return list(Device.select())

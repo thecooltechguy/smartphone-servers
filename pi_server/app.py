@@ -4,12 +4,12 @@ from flask import Flask, request, jsonify
 from flask_socketio import SocketIO, send, emit
 
 import db
-import job_checker
+import checker
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = "actualsecret"
 socketio = SocketIO(app)
-job_checker = job_checker.JobChecker()
+checker = checker.Checker()
 
 # TODO: Flesh out all API code to properly format and return errors as json responses
 @app.route('/devices/register/', methods=['POST'])
@@ -81,7 +81,7 @@ def job_submit():
     socketio.emit("task_submission", {'device_id': target_device_id, 'job': job.to_json()})
 
     # used to make sure that the phone eventually acknowledges it, if not then we reschedule the job
-    job_checker.add_pending_acknowledgement(job.id, target_device_id)
+    checker.add_pending_acknowledgement(job.id, target_device_id)
 
     return jsonify(success=True, job_id=job.id)
 
@@ -160,5 +160,5 @@ def handle_phone_response(data):
 
 if __name__ == '__main__':
     # app.run(host="0.0.0.0")
-    job_checker.run()
+    checker.run()
     socketio.run(app, host='0.0.0.0')
