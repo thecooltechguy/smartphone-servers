@@ -4,10 +4,12 @@ from flask import Flask, request, jsonify
 from flask_socketio import SocketIO, send, emit
 
 import db
+import job_checker
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = "actualsecret"
 socketio = SocketIO(app)
+job_checker = job_checker.JobChecker()
 
 # TODO: Flesh out all API code to properly format and return errors as json responses
 @app.route('/devices/register/', methods=['POST'])
@@ -68,9 +70,18 @@ def job_submit():
     if not devices_not_in_use:
         return jsonify(success=False, error_code="ALL_DEVICES_ARE_BUSY"), 500
 
-    # For now, just simply pick the first device that's not in use
-    target_device_id = devices_not_in_use[0].id
+    # pick a device id that has the least number of failure acks and failure jobs
+    min_failed_count = 100000000 # some randomly big number for now
+    for device in devices_not_in_use:
+        if device.num_failed_acks + device.num_failed_jobs < min_failed_count:
+            target_device_id = device.id
+            min_failed_count = device.num_failed_acks + device.num_failed_jobs
+
+
     socketio.emit("task_submission", {'device_id': target_device_id, 'job': job.to_json()})
+
+    # used to make sure that the phone eventually acknowledges it, if not then we reschedule the job
+    job_checker.add_pending_acknowledgement(job.id, target_device_id)
 
     return jsonify(success=True, job_id=job.id)
 
@@ -149,4 +160,5 @@ def handle_phone_response(data):
 
 if __name__ == '__main__':
     # app.run(host="0.0.0.0")
+    job_checker.run()
     socketio.run(app, host='0.0.0.0')

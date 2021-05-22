@@ -17,6 +17,9 @@ class Device(BaseModel):
     last_heartbeat = DateTimeField(default=datetime.datetime.utcnow)
     time_updated = DateTimeField()
 
+    num_failed_jobs = IntegerField(default=0)
+    num_failed_acks = IntegerField(default=0)
+
     def save(self, *args, **kwargs):
         self.time_updated = datetime.datetime.utcnow()
         return super(Device, self).save(*args, **kwargs)
@@ -31,7 +34,9 @@ class Device(BaseModel):
                 "num_total" : len(self.assigned_jobs)
             },
             "smart_plug_key" : self.smart_plug_key,
-            "metadata" : self.metadata
+            "metadata" : self.metadata,
+            "num_failed_jobs": self.num_failed_jobs,
+            "num_failed_acks": self.num_failed_acks
         }
 
 
@@ -56,6 +61,8 @@ class Job(BaseModel):
     time_created = DateTimeField(default=datetime.datetime.utcnow)
     time_updated = DateTimeField()
 
+    num_rescheduled = IntegerField(default=0)
+
     def save(self, *args, **kwargs):
         self.time_updated = datetime.datetime.utcnow()
         return super(Job, self).save(*args, **kwargs)
@@ -72,7 +79,8 @@ class Job(BaseModel):
             },
             "code_url" : self.code_url,
             "time_created" : str(self.time_created),
-            "time_updated" : str(self.time_updated)
+            "time_updated" : str(self.time_updated),
+            "num_rescheduled" : self.num_rescheduled
         }
 
 
@@ -84,10 +92,11 @@ def create_device(smart_plug_key, metadata):
 def create_job(job_spec):
     assert "resource_requirements" in job_spec and "code_url" in job_spec
     job = Job(status=Job.UNASSIGNED,
-              cpus=job_spec.get("cpus", -1),
-              memory_mb=job_spec.get("memory_mb", -1),
-              max_runtime_secs=job_spec.get("max_runtime_secs", -1),
-              code_url = job_spec['code_url'])
+              cpus=job_spec["resource_requirements"].get("cpus", -1),
+              memory_mb=job_spec["resource_requirements"].get("memory_mb", -1),
+              max_runtime_secs=job_spec["resource_requirements"].get("max_runtime_secs", -1),
+              code_url = job_spec['code_url'],
+              num_rescheduled = job_spec.get("num_rescheduled", 0))
     job.save()
     return job
 
