@@ -1,12 +1,13 @@
 import socketio
 import requests
 import time
+import random
 
 SERVER_ENDPOINT = "http://localhost:5000"
 
 sio = socketio.Client()
 register_url = f'{SERVER_ENDPOINT}/devices/register/'
-myobj = {"smart_plug_key": 'random_key'}
+myobj = {"smart_plug_key": 'random_key', 'id': random.randint(1,1000)}
 
 resp = requests.post(register_url, json = myobj).json()
 device_id = (resp["device_id"])

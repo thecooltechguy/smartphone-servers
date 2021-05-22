@@ -94,6 +94,8 @@ class Checker:
         job = db.get_job(job_id)
         job_json = job.to_json()
 
+        # cancel the job
+        job.cancel()
         job = db.update_job(job_json['id'], job.FAILED)
         job.assigned_device_id = None 
         job.save()
@@ -101,17 +103,9 @@ class Checker:
         print(f"[JOB {job.id}] cancelled and rescheduled.")
 
         # Reschedule the job for another device, if and only if the number of retries don't go past 3.
-        if job_json["num_rescheduled"] < 3:
-            rescheduled_job_spec = {
-                "resource_requirements": job_json["resource_requirements"],
-                "code_url": job_json["code_url"],
-                "num_rescheduled": job_json["num_rescheduled"] + 1
-            }
-            # rescheduled_job = create_job(rescheduled_job_spec)
-            resp = requests.post(submit_job_url, json=rescheduled_job_spec).json()
-            if(resp["success"]):
-                new_job_id = resp["job_id"]
-                print(f"[JOB {job.id} --(rescheduled)--> JOB {new_job_id}]")
+        if job.can_be_retried:
+            if(db.schedule_job(job)):
+                print(f"[JOB {job.id} RESCHEDULED]")
             else:
                 print(f"[JOB {job.id} RESCHEDULE FAILURE]")
 

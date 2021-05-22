@@ -15,11 +15,16 @@ checker = checker.Checker()
 @app.route('/devices/register/', methods=['POST'])
 def register_device():
     metadata = request.get_json()
+    device_id = metadata.pop('id')
+    if not device_id:
+        return jsonify(success=False, error_code="MISSING_DEVICE_ID"), 400
+    if not isinstance(device_id, int):
+        return jsonify(success=False, error_code="DEVICE_ID_NOT_AN_INTEGER"), 400
     smart_plug_key = metadata.pop("smart_plug_key")
     if not smart_plug_key:
         return jsonify(success=False, error_code="MISSING_DEVICE_SMART_PLUG_KEY"), 400
 
-    device_id = db.create_device(smart_plug_key=smart_plug_key, metadata=metadata)
+    db.create_device(device_id=device_id, smart_plug_key=smart_plug_key, metadata=metadata)
     return jsonify(success=True, device_id=device_id)
 
 
@@ -31,6 +36,8 @@ def device_heartbeat(device_id):
 
     # metadata stores a json object of arbitrary device related data (such as battery life, cpu mem, etc.)
     device.metadata = request.get_json()
+    device.update_metadata_history()
+
     device.last_heartbeat = datetime.utcnow()
     device.save()
 
@@ -59,29 +66,9 @@ def job_submit():
 
     job = db.create_job(job_spec=body)
 
-    # Choose a device to send this job to
-    # TODO: Add some sort of cron/redundancy to attempt to re-assign jobs that don't get acknowledged, etc.
-    #  This should occur as some sort of cron process, but for the sake of an MVP, we just try to assign each job once
-
-    # Choose a device id that currently doesn't have any assigned jobs
-    # TODO: This logic would of course change once we begin to account for cpus/mem, at which point,
-    #  the device selection query would select all devices that have enough resources to run this job, etc.
-    devices_not_in_use = db.get_devices_not_currently_in_use()
-    if not devices_not_in_use:
-        return jsonify(success=False, error_code="ALL_DEVICES_ARE_BUSY"), 500
-
-    # pick a device id that has the least number of failure acks and failure jobs
-    min_failed_count = 100000000 # some randomly big number for now
-    for device in devices_not_in_use:
-        if device.num_failed_acks + device.num_failed_jobs < min_failed_count:
-            target_device_id = device.id
-            min_failed_count = device.num_failed_acks + device.num_failed_jobs
-    
-    print("[JOB ASSIGNMENT] Job", job.id, "to device", target_device_id)
-    socketio.emit("task_submission", {'device_id': target_device_id, 'job': job.to_json()})
-
-    # used to make sure that the phone eventually acknowledges it, if not then we reschedule the job
-    checker.add_pending_acknowledgement(job.id, target_device_id)
+    job_schedule_success = db.schedule_job(job)
+    if not job_schedule_success:
+        return jsonify(success=False, error_code="NO_DEVICES_ARE_AVAILABLE"), 500
 
     return jsonify(success=True, job_id=job.id)
 
@@ -146,6 +133,26 @@ def test_connect():
 def test_disconnect():
     print('A device has disconnected')
 
+@socketio.on('cancel_job')
+def handle_phone_cancel_job_response(data):
+    success = data['success']
+    device_id = data['device_id']
+    job_id = data['job_id']
+
+    if success:
+        # the phone was able to stop this job
+        job = db.get_job(job_id=job_id)
+        job.status = db.Job.FAILED
+        job.assigned_device = None
+        job.save()
+        print (f"Device id={device_id} was able to cancel job id={job_id}")
+    else:
+        # the phone could not cancel this job
+        # in this case, we don't do anything on this part of the SERVER side, since we should have a separate server cron process that handles failed jobs
+        # (e.g., picks such failed jobs up and retry them if needed)
+        # the device, however, would need to somehow end this task.
+        print (f"Device id={device_id} was NOT able to cancel job id={job_id}")
+
 @socketio.on('task_acknowledgement')
 def handle_phone_response(data):
     device_id = data['device_id']
@@ -154,7 +161,10 @@ def handle_phone_response(data):
     job = db.get_job(job_id=job_id)
     job.status = db.Job.ASSIGNED
     job.assigned_device = device_id
+    job.num_attempts += 1
     job.save()
+
+    checker.remove_pending_acknowledgement(job.id)
 
     print (f"Device id={device_id} has acknowledged job id={job_id}")
 

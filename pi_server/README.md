@@ -91,6 +91,8 @@ Example response:
         "memory_mb": -1
       }, 
       "status": 3, 
+      "num_attempts" : 1, 
+      "can_be_retried" : false,
       "time_created": "2021-05-04 00:40:21.467057", 
       "time_updated": "2021-05-04 00:40:26.487776"
     }
