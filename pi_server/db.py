@@ -1,21 +1,49 @@
 from peewee import *
 from playhouse.sqlite_ext import *
-import datetime
+import datetime, power
 
 db = SqliteDatabase('database.db')
+
+# number of minutes in between heart beats that still considers the device is alive and healthy
+HEARTBEAT_ACTIVE_RANGE_MINUTES = 1
+METADATA_HISTORY_SIZE = 5
+MAX_JOB_ATTEMPTS = 5
 
 class BaseModel(Model):
     class Meta:
         database = db
 
 class Device(BaseModel):
+    id = IntegerField(primary_key=True, unique=True, null=False)
+
     metadata = JSONField()
+
+    # This will store the last `METADATA_HISTORY_SIZE` metadatas received from the device
+    # NEVER set this field value manually, this will be auto-handled in update_metadata_history(),
+    # which should be called whenever the device's metadata field has been updated
+    metadata_history = JSONField()
 
     smart_plug_key = TextField()
 
     time_created = DateTimeField(default=datetime.datetime.utcnow)
     last_heartbeat = DateTimeField(default=datetime.datetime.utcnow)
     time_updated = DateTimeField()
+
+    @property
+    def is_active(self):
+        if not self.last_heartbeat:
+            return False
+        return datetime.datetime.utcnow() - self.last_heartbeat <= datetime.timedelta(minutes=HEARTBEAT_ACTIVE_RANGE_MINUTES)
+
+    def update_metadata_history(self):
+        metadata_history = self.metadata_history
+        metadata_history.append(self.metadata)
+        metadata_history = metadata_history[-METADATA_HISTORY_SIZE:]
+        self.metadata_history = metadata_history
+
+    def get_avg_historical_system_metric(self, metric_name, default_value=0):
+        vals = [metadata.get("system", {}).get(metric_name, default_value) for metadata in self.metadata_history]
+        return sum(vals) / len(vals)
 
     def save(self, *args, **kwargs):
         self.time_updated = datetime.datetime.utcnow()
@@ -34,12 +62,29 @@ class Device(BaseModel):
             "metadata" : self.metadata
         }
 
+    def stop_charging(self):
+        power.power_off(self.smart_plug_key)
+
+    def start_charging(self):
+        power.power_on(self.smart_plug_key)
+
+    def get_battery_level(self):
+        return self.metadata['system']['battery']
+
+    def needs_to_start_charging(self):
+        return self.get_battery_level() < 0.2
+
+    def needs_to_stop_charging(self):
+        return self.get_battery_level() > 0.8
+
 
 class Job(BaseModel):
     UNASSIGNED = 0
     ASSIGNED = 1
     FAILED = 2
     SUCCEEDED = 3
+
+    num_attempts = IntegerField(default=0)
 
     status = IntegerField(choices=[(UNASSIGNED, "UNASSIGNED"), (ASSIGNED, "ASSIGNED"), (FAILED, "FAILED"), (SUCCEEDED, "SUCCESS")], default=0)
     assigned_device = ForeignKeyField(Device, backref="assigned_jobs", null=True, default=None)
@@ -60,10 +105,24 @@ class Job(BaseModel):
         self.time_updated = datetime.datetime.utcnow()
         return super(Job, self).save(*args, **kwargs)
 
+    @property
+    def can_be_retried(self):
+        if self.status == Job.SUCCEEDED:
+            return False
+        return self.num_attempts < MAX_JOB_ATTEMPTS
+
+    def cancel(self):
+        if self.assigned_device:
+            from app import socketio
+            target_device_id = self.assigned_device.id
+            socketio.emit("cancel_job", {'device_id': target_device_id, 'job_id': self.id})
+
     def to_json(self):
         return {
             "id" : self.id,
             "status" : self.status,
+            "num_attempts" : self.num_attempts,
+            "can_be_retried" : self.can_be_retried,
             "assigned_device_id" : None if not self.assigned_device else self.assigned_device.id,
             "resource_requirements" : {
                 "cpus" : self.cpus,
@@ -76,17 +135,17 @@ class Job(BaseModel):
         }
 
 
-def create_device(smart_plug_key, metadata):
-    device = Device(smart_plug_key=smart_plug_key, metadata=metadata)
+def create_device(device_id, smart_plug_key, metadata):
+    device = Device(id=device_id, smart_plug_key=smart_plug_key, metadata=metadata)
+    device.update_metadata_history()
     device.save()
-    return device.id
 
 def create_job(job_spec):
     assert "resource_requirements" in job_spec and "code_url" in job_spec
     job = Job(status=Job.UNASSIGNED,
-              cpus=job_spec.get("cpus", -1),
-              memory_mb=job_spec.get("memory_mb", -1),
-              max_runtime_secs=job_spec.get("max_runtime_secs", -1),
+              cpus=job_spec["resource_requirements"].get("cpus", -1),
+              memory_mb=job_spec["resource_requirements"].get("memory_mb", -1),
+              max_runtime_secs=job_spec["resource_requirements"].get("max_runtime_secs", -1),
               code_url = job_spec['code_url'])
     job.save()
     return job
@@ -116,14 +175,10 @@ def get_job(job_id):
 def update_device(device_id, metadata):
     device = get_device(device_id=device_id)
     device.metadata = metadata
+    device.update_metadata_history()
     device.save()
 
 def update_job(job_id, status):
     job = get_job(job_id=job_id)
     job.status = status
     return job
-
-def assign_jobs():
-    # TODO:
-    pass
-
