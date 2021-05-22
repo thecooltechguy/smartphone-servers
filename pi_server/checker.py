@@ -4,6 +4,7 @@ import requests
 
 from datetime import timedelta
 import datetime
+import time
 
 SERVER_ENDPOINT = "http://localhost:5000"
 submit_job_url = f"{SERVER_ENDPOINT}/jobs/submit/"
@@ -72,6 +73,9 @@ class Checker:
                     device.start_charging()
                 elif device.needs_to_stop_charging():
                     device.stop_charging()
+            
+            # Sleep this thread for a few seconds
+            time.sleep(3)
                 
 
     def stop(self):

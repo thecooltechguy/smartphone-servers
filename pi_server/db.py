@@ -29,6 +29,10 @@ class Device(BaseModel):
     last_heartbeat = DateTimeField(default=datetime.datetime.utcnow)
     time_updated = DateTimeField()
 
+    num_failed_jobs = IntegerField(default=0)
+    num_failed_acks = IntegerField(default=0)
+    decommissioned = BooleanField(default=False)
+
     @property
     def is_active(self):
         if not self.last_heartbeat:
@@ -60,7 +64,10 @@ class Device(BaseModel):
                 "num_total" : len(self.assigned_jobs)
             },
             "smart_plug_key" : self.smart_plug_key,
-            "metadata" : self.metadata
+            "metadata" : self.metadata,
+            "num_failed_jobs": self.num_failed_jobs,
+            "num_failed_acks": self.num_failed_acks
+            
         }
 
     def stop_charging(self):
