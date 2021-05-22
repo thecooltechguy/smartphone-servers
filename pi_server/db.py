@@ -160,6 +160,32 @@ def get_devices_not_currently_in_use():
     # TODO: A more optimized query would involve JOINS, but for now, we're doing it the naive way
     return [device for device in get_all_devices() if len(device.assigned_jobs) == 0]
 
+def get_target_device_for_job():
+    # Choose a device id that currently doesn't have any assigned jobs
+    # TODO: This logic would of course change once we begin to account for cpus/mem, at which point,
+    #  the device selection query would select all devices that have enough resources to run this job, etc.
+    candidate_devices_for_job = get_devices_not_currently_in_use()
+    candidate_devices_for_job = [device for device in candidate_devices_for_job if device.is_active]
+    candidate_devices_for_job = sorted(candidate_devices_for_job, key = lambda device: device.get_avg_historical_system_metric(metric_name="cpu"))
+    if not candidate_devices_for_job:
+        return None
+    # Pick the device that's available, healthy, and has the lowest historical avg. cpu usage
+    return candidate_devices_for_job[0]
+
+def schedule_job(job):
+    from app import socketio
+
+    # Choose a device to send this job to
+    # TODO: Add some sort of cron/redundancy to attempt to re-assign jobs that don't get acknowledged, etc.
+    #  This should occur as some sort of cron process, but for the sake of an MVP, we just try to assign each job once
+    target_device = get_target_device_for_job()
+
+    if not target_device:
+        return False
+
+    socketio.emit("task_submission", {'device_id': target_device.id, 'job': job.to_json()})
+    return True
+
 def get_all_devices():
     return list(Device.select())
 

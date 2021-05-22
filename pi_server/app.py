@@ -64,23 +64,9 @@ def job_submit():
 
     job = db.create_job(job_spec=body)
 
-    # Choose a device to send this job to
-    # TODO: Add some sort of cron/redundancy to attempt to re-assign jobs that don't get acknowledged, etc.
-    #  This should occur as some sort of cron process, but for the sake of an MVP, we just try to assign each job once
-
-    # Choose a device id that currently doesn't have any assigned jobs
-    # TODO: This logic would of course change once we begin to account for cpus/mem, at which point,
-    #  the device selection query would select all devices that have enough resources to run this job, etc.
-    candidate_devices_for_job = db.get_devices_not_currently_in_use()
-    candidate_devices_for_job = [device for device in candidate_devices_for_job if device.is_active]
-    candidate_devices_for_job = sorted(candidate_devices_for_job, key = lambda device: device.get_avg_historical_system_metric(metric_name="cpu"))
-
-    if not candidate_devices_for_job:
+    job_schedule_success = db.schedule_job(job)
+    if not job_schedule_success:
         return jsonify(success=False, error_code="NO_DEVICES_ARE_AVAILABLE"), 500
-
-    # Pick the device that's available, healthy, and has the lowest historical avg. cpu usage
-    target_device_id = candidate_devices_for_job[0].id
-    socketio.emit("task_submission", {'device_id': target_device_id, 'job': job.to_json()})
 
     return jsonify(success=True, job_id=job.id)
 
