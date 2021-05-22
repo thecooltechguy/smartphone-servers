@@ -2,6 +2,11 @@ from peewee import *
 from playhouse.sqlite_ext import *
 import datetime, power
 
+try:
+    from __main__ import socketio
+except ImportError:
+    from app import socketio
+
 db = SqliteDatabase('database.db')
 
 # number of minutes in between heart beats that still considers the device is alive and healthy
@@ -14,7 +19,7 @@ class BaseModel(Model):
         database = db
 
 class Device(BaseModel):
-    id = IntegerField(primary_key=True, unique=True, null=False)
+    id = IntegerField(primary_key=True, unique=True)
 
     metadata = JSONField()
 
@@ -36,7 +41,7 @@ class Device(BaseModel):
         return datetime.datetime.utcnow() - self.last_heartbeat <= datetime.timedelta(minutes=HEARTBEAT_ACTIVE_RANGE_MINUTES)
 
     def update_metadata_history(self):
-        metadata_history = self.metadata_history
+        metadata_history = self.metadata_history or []
         metadata_history.append(self.metadata)
         metadata_history = metadata_history[-METADATA_HISTORY_SIZE:]
         self.metadata_history = metadata_history
@@ -113,7 +118,7 @@ class Job(BaseModel):
 
     def cancel(self):
         if self.assigned_device:
-            from app import socketio
+            # from app import socketio
             target_device_id = self.assigned_device.id
             socketio.emit("cancel_job", {'device_id': target_device_id, 'job_id': self.id})
 
@@ -138,7 +143,7 @@ class Job(BaseModel):
 def create_device(device_id, smart_plug_key, metadata):
     device = Device(id=device_id, smart_plug_key=smart_plug_key, metadata=metadata)
     device.update_metadata_history()
-    device.save()
+    device.save(force_insert=True)
 
 def create_job(job_spec):
     assert "resource_requirements" in job_spec and "code_url" in job_spec
@@ -173,8 +178,6 @@ def get_target_device_for_job():
     return candidate_devices_for_job[0]
 
 def schedule_job(job):
-    from app import socketio
-
     # Choose a device to send this job to
     # TODO: Add some sort of cron/redundancy to attempt to re-assign jobs that don't get acknowledged, etc.
     #  This should occur as some sort of cron process, but for the sake of an MVP, we just try to assign each job once

@@ -3,21 +3,28 @@ from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO, send, emit
 
-import db
-
 app = Flask(__name__)
 app.config['SECRET_KEY'] = "actualsecret"
 socketio = SocketIO(app)
+
+import db
 
 # TODO: Flesh out all API code to properly format and return errors as json responses
 @app.route('/devices/register/', methods=['POST'])
 def register_device():
     metadata = request.get_json()
     device_id = metadata.pop('id')
-    if not device_id:
+
+    if device_id is None:
         return jsonify(success=False, error_code="MISSING_DEVICE_ID"), 400
+
     if not isinstance(device_id, int):
         return jsonify(success=False, error_code="DEVICE_ID_NOT_AN_INTEGER"), 400
+
+    # check if the device is already registered
+    if db.get_device(device_id=device_id):
+        return jsonify(success=False, error_code="DEVICE_ALREADY_REGISTERED"), 400
+
     smart_plug_key = metadata.pop("smart_plug_key")
     if not smart_plug_key:
         return jsonify(success=False, error_code="MISSING_DEVICE_SMART_PLUG_KEY"), 400
@@ -26,11 +33,11 @@ def register_device():
     return jsonify(success=True, device_id=device_id)
 
 
-@app.route("/devices/<device_id>/heartbeat/", methods=['POST'])
+@app.route("/devices/<int:device_id>/heartbeat/", methods=['POST'])
 def device_heartbeat(device_id):
     device = db.get_device(device_id=device_id)
     if not device:
-        return jsonify(success=False), 400
+        return jsonify(success=False, error_code="DEVICE_NOT_FOUND"), 400
 
     # metadata stores a json object of arbitrary device related data (such as battery life, cpu mem, etc.)
     device.metadata = request.get_json()
@@ -70,7 +77,7 @@ def job_submit():
 
     return jsonify(success=True, job_id=job.id)
 
-@app.route("/jobs/<job_id>/update_status/", methods=['POST'])
+@app.route("/jobs/<int:job_id>/update_status/", methods=['POST'])
 def job_update_status(job_id):
     body = request.get_json()
 
@@ -120,7 +127,7 @@ Socket IO events:
 '''
 @socketio.on('connect')
 def test_connect():
-    device_id = request.args.get("device_id")
+    device_id = request.args.get("device_id", type=int)
     device = db.get_device(device_id=device_id)
     if not device:
         # Unknown device tried to connect
@@ -166,4 +173,4 @@ def handle_phone_response(data):
 
 if __name__ == '__main__':
     # app.run(host="0.0.0.0")
-    socketio.run(app, host='0.0.0.0')
+    socketio.run(app, host='0.0.0.0', debug=True)
