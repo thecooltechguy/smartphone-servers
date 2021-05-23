@@ -3,29 +3,29 @@ import time
 import threading
 import util
 
+HEARTBEAT_INTERVAL_SECS = 5
+
+# get the device id (should already exist on the phone)
+with open("./id.txt", "r") as f:
+    device_id = int(f.readline())
+
 def register_device():
     url = "http://0.0.0.0:5000/devices/register/"
     # hardcode the params for now
     params = {
         "timestamp" : time.ctime(),
-        "smart_plug_key": "key"
+        "smart_plug_key": "key",
+        "id" : device_id
     }
     resp = requests.post(url, json = params)
-    if resp.status_code != 200:
-        print("Unsuccessful Request")
-        return
-    
-    id = resp.json()['device_id']
-    # store the device id locally in a file
-    with open("./id.txt", "w") as f:
-        f.write(str(id))
+    resp_json = resp.json()
+    if resp.status_code == 400 and resp_json['error_code'] == "DEVICE_ALREADY_REGISTERED":
+        # device is already registered, this is a benign error
+        print ("This device is already registered")
+    else:
+        assert resp.status_code == 200, "Device registration failed! " + str(resp_json)
 
 def send_heartbeat():
-    # get the device id
-    id = None
-    with open("./id.txt", "r") as f:
-        id = f.readline()
-    
     '''
     result = subprocess.Popen(["upower"], stdout = subprocess.PIPE)
     output = (result.communicate())
@@ -36,21 +36,24 @@ def send_heartbeat():
         "system" : {
             "cpu" : 0.6,
             "battery": 0.82,
-            
         }
     }
     #util.cpu_use(),
     #        "battery": util.battery_level(),
     #        "disk": util.disk_use(),
     #        "pluggedin": util.plugged_in()
-    url = "http://0.0.0.0:5000/devices/{}/heartbeat/".format(id)
+    url = "http://0.0.0.0:5000/devices/{}/heartbeat/".format(device_id)
     resp = requests.post(url, json = params)
-    if resp.status_code == 400:
+    resp_json = resp.json()
+    if resp.status_code == 400 and resp_json['error_code'] == "DEVICE_NOT_FOUND":
+        # The device was not found, so register the device and retry the heartbeat
         register_device()
         resp = requests.post(url, json = params)
+
+    assert resp.status_code == 200, "Device heartbeat failed!"
     
-    # send a heartbeat every 60 seconds
-    threading.Timer(60, send_heartbeat).start()
+    # send a heartbeat every `HEARTBEAT_INTERVAL_SECS` seconds
+    threading.Timer(HEARTBEAT_INTERVAL_SECS, send_heartbeat).start()
 
 register_device()
 send_heartbeat()

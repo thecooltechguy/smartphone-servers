@@ -8,7 +8,7 @@ STATUS_FAILED = 2
 STATUS_SUCCEDED = 3
 
 # get the device id
-device_id = None
+# Note: device id 0 is registered for testing, real devices should use ids >= 1
 with open("./id.txt", "r") as f:
     device_id = int(f.readline())
 
