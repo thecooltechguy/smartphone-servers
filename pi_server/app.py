@@ -150,8 +150,6 @@ class Checker:
         if job.can_be_retried:
             if(schedule_job(job)):
                 print(f"[JOB {job.id} RESCHEDULED]")
-            else:
-                print(f"[JOB {job.id} NO VALID TARGET DEVICES]")
         else:
             print(f"[JOB {job.id} HIT RESCHEDULE LIMIT]")
 
@@ -164,6 +162,7 @@ eventlet.spawn(checker.check_phones)
 def schedule_job(job):
     device_id = db.schedule_job(job)
     if device_id is None:
+        print("[NO DEVICES AVAILABLE]")
         return False
 
     # used to make sure that the phone eventually acknowledges it, if not then we reschedule the job
@@ -238,7 +237,7 @@ def job_submit():
 
     job = db.create_job(job_spec=body)
 
-    job_schedule_success = db.schedule_job(job)
+    job_schedule_success = schedule_job(job)
     if not job_schedule_success:
         return jsonify(success=False, error_code="NO_DEVICES_ARE_AVAILABLE"), 500
 
