@@ -70,7 +70,8 @@ class Device(BaseModel):
             "smart_plug_key" : self.smart_plug_key,
             "metadata" : self.metadata,
             "num_failed_jobs": self.num_failed_jobs,
-            "num_failed_acks": self.num_failed_acks
+            "num_failed_acks": self.num_failed_acks,
+            "decommissioned": self.decommissioned
             
         }
 
@@ -81,7 +82,12 @@ class Device(BaseModel):
         power.power_on(self.smart_plug_key)
 
     def get_battery_level(self):
-        return self.metadata['system']['battery']
+        if 'system' in self.metadata and 'battery' in self.metadata['system']:
+            return self.metadata['system']['battery']
+        else:
+            # would rather have a phone with no metadata to run out of battery than to keep charging it.
+            return 1.0 
+            
 
     def needs_to_start_charging(self):
         return self.get_battery_level() < 0.2
@@ -89,21 +95,19 @@ class Device(BaseModel):
     def needs_to_stop_charging(self):
         return self.get_battery_level() > 0.8
 
+    def decommission(self):
+        self.decommissioned = True
+        self.save()
+    
+    def recommission(self):
+        self.decommissioned = False
+        self.save()
+    
+    def reset_counters_and_recommission(self):
+        self.num_failed_acks = 0
+        self.num_failed_jobs = 0
+        self.recommission()
 
-    def stop_charging(self):
-        power.power_off(self.smart_plug_key)
-        
-    def start_charging(self):
-        power.power_on(self.smart_plug_key)
-
-    def get_battery_level(self):
-        return self.metadata['system']['battery']
-
-    def needs_to_start_charging(self):
-        return self.get_battery_level() < 0.2
-
-    def needs_to_stop_charging(self):
-        return self.get_battery_level() > 0.8
 
 class Job(BaseModel):
     UNASSIGNED = 0
@@ -185,14 +189,14 @@ def get_device(device_id):
 
 def get_devices_not_currently_in_use():
     # TODO: A more optimized query would involve JOINS, but for now, we're doing it the naive way
-    return [device for device in get_all_devices() if len(device.assigned_jobs) == 0 and device.decommissioned == False]
+    return [device for device in get_all_devices() if len(device.assigned_jobs) == 0]
 
 def get_target_device_for_job():
     # Choose a device id that currently doesn't have any assigned jobs
     # TODO: This logic would of course change once we begin to account for cpus/mem, at which point,
     #  the device selection query would select all devices that have enough resources to run this job, etc.
     candidate_devices_for_job = get_devices_not_currently_in_use()
-    candidate_devices_for_job = [device for device in candidate_devices_for_job if device.is_active]
+    candidate_devices_for_job = [device for device in candidate_devices_for_job if (not device.is_active and not device.decommissioned)]
     candidate_devices_for_job = sorted(candidate_devices_for_job, key = lambda device: device.get_avg_historical_system_metric(metric_name="cpu"))
     if not candidate_devices_for_job:
         return None
@@ -206,13 +210,12 @@ def schedule_job(job):
     target_device = get_target_device_for_job()
 
     if not target_device:
-        return False
-
-    # used to make sure that the phone eventually acknowledges it, if not then we reschedule the job
-    checker.add_pending_acknowledgement(job.id, target_device.id)
+        return None
     
+    update_job(job.id, job.UNASSIGNED)
+    job.save()
     socketio.emit("task_submission", {'device_id': target_device.id, 'job': job.to_json()})
-    return True
+    return target_device.id
 
 def get_all_devices():
     return list(Device.select())

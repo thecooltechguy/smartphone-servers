@@ -1,14 +1,178 @@
+# eventlet must be called very very early (before Flask) so I can use it to do chron jobs with socketio
+# without eventlet = alot of issues with the packet not sending over to the client and issues 
+# of recursion depth exceeding limits.
+import eventlet
+eventlet.monkey_patch()
+
 from datetime import datetime
 
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO, send, emit
 
+
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = "actualsecret"
 socketio = SocketIO(app)
-checker = checker.Checker()
 
 import db
+
+
+# For the Checker class
+import threading
+from datetime import timedelta
+import datetime
+import time
+
+
+
+# ============== BEGINNING OF CHECKER CODE ============== #
+# Checker Chron
+# 1. checks each job to see if they time out
+# 2. if job times out, restart it
+# 3. if job repeatedly fails, then stop it after 3 retries
+# 4. if phone does not acknowledge task, increment its failed acks num
+
+MAX_FAILS = 100
+CHECK_JOBS_INTERVAL_SEC = 5
+ACK_TIMEOUT = 10
+class Checker:
+
+    def __init__(self):
+        self.stopped = False
+        self.pending_job_acks = {}
+
+    def check_jobs(self):
+        if self.stopped:
+            # stops recursively generating threads.
+            return
+        while not self.stopped:
+            print("[CHECKING JOBS]")
+            jobs = db.get_all_jobs()
+
+            # ==== for each job ====
+            for job in jobs:
+                job_json = job.to_json()
+                job_max_secs = job_json["resource_requirements"]["max_runtime_secs"]
+
+                # Check if job timed out, if so then try to cancel it and reschedule it.
+                if job_max_secs > 0 and job_json["status"] == job.ASSIGNED and job_json["assigned_device_id"] is not None:
+                    time_updated = datetime.datetime.strptime(job_json["time_updated"], '%Y-%m-%d %H:%M:%S.%f')
+                    timeout_datetime = timedelta(seconds = job_max_secs) + time_updated
+                    if timeout_datetime < datetime.datetime.utcnow():
+
+                        # update device's num_failed_jobs
+                        device = db.get_device(job_json["assigned_device_id"])
+                        device.num_failed_jobs += 1
+                        device.save()
+
+                        print("[JOB TIMEOUT]: Device", device.id, "on Job", job.id)
+
+                        self.cancel_and_reschedule_job(job.id)
+
+
+                # For unassigned jobs.
+                if job_json["status"] == job.UNASSIGNED:
+                    
+                    # Check if the phone has not acknowledged the job for 10 seconds. If so, then increase the num_failed_acks and reschedule the job
+                    time_updated = datetime.datetime.strptime(job_json["time_updated"], '%Y-%m-%d %H:%M:%S.%f')
+                    timeout_datetime = timedelta(seconds = ACK_TIMEOUT) + time_updated
+                    if timeout_datetime < datetime.datetime.utcnow() and job.id in self.pending_job_acks:
+
+                        # update device's num_failed_acks
+                        device = db.get_device(self.pending_job_acks[job.id])
+                        device.num_failed_acks += 1
+                        device.save()
+
+                        print("[NO DEVICE ACK]: Device", device.id, "on Job", job.id)
+
+                        self.remove_pending_acknowledgement(job.id)
+                        self.cancel_and_reschedule_job(job.id)
+                    
+                    # For jobs that are just unassigned in general, hence there is no pending ack's:
+                    elif job.id not in self.pending_job_acks and job.can_be_retried: 
+                        schedule_job(job)
+
+                # For failed jobs: retry them.
+                if job_json["status"] == job.FAILED and job.can_be_retried:     
+                    schedule_job(job)
+
+
+            # ==== END of "for each job" section ====
+
+            # Start another thread in a few seconds
+            # threading.Timer(CHECK_JOBS_INTERVAL_SEC, self.check_jobs).start()
+            time.sleep(CHECK_JOBS_INTERVAL_SEC)
+
+            
+    def check_phones(self):
+        if self.stopped:
+            # stops recursively generating threads.
+            return
+        
+        while not self.stopped:
+            print("[CHECKING PHONES]")
+
+            # ==== Check devices' num failed counts ====
+            for device in db.get_all_devices():
+
+                # ==== If the device has failed too many times, decommission it ==== #
+                if device.num_failed_acks + device.num_failed_jobs > MAX_FAILS and not device.decommissioned:
+                    device.stop_charging()
+                    device.decommission()
+                    print(f"[DEVICE {device.id} DECOMMISSIONED.")
+
+            # Start another thread in a min
+            # threading.Timer(db.HEARTBEAT_ACTIVE_RANGE_MINUTES * 60, self.check_phones).start()
+            time.sleep(db.HEARTBEAT_ACTIVE_RANGE_MINUTES * 60)
+                
+
+    def stop(self):
+        self.stopped = True
+
+    def add_pending_acknowledgement(self, job_id, device_id):
+        self.pending_job_acks[job_id] = device_id
+    
+    def remove_pending_acknowledgement(self, job_id):
+        if job_id in self.pending_job_acks:
+            del self.pending_job_acks[job_id]
+    
+    def cancel_and_reschedule_job(self, job_id):
+        job = db.get_job(job_id)
+        job_json = job.to_json()
+
+        # cancel the job
+        job.cancel()
+
+        print(f"[JOB {job.id}] cancelled and rescheduled.")
+
+        # Reschedule the job for another device, if and only if the number of retries don't go past 3.
+        if job.can_be_retried:
+            if(schedule_job(job)):
+                print(f"[JOB {job.id} RESCHEDULED]")
+            else:
+                print(f"[JOB {job.id} NO VALID TARGET DEVICES]")
+        else:
+            print(f"[JOB {job.id} HIT RESCHEDULE LIMIT]")
+
+checker = Checker()
+
+
+eventlet.spawn(checker.check_jobs)
+eventlet.spawn(checker.check_phones)
+
+def schedule_job(job):
+    device_id = db.schedule_job(job)
+    if device_id is None:
+        return False
+
+    # used to make sure that the phone eventually acknowledges it, if not then we reschedule the job
+    checker.add_pending_acknowledgement(job.id, device_id)
+    return True
+
+
+# ============== END OF CHECKER CODE ============== #
+
 
 # TODO: Flesh out all API code to properly format and return errors as json responses
 @app.route('/devices/register/', methods=['POST'])
@@ -49,10 +213,12 @@ def device_heartbeat(device_id):
 
     # TODO: need to add charging logic based on phone's battery level on heartbeat
     # possibly something like phone.metadata.charge < 20 -> phone.start_charging() ...
-    if device.needs_to_start_charging():
+    if device.needs_to_start_charging() and not device.decommissioned:
         device.start_charging()
-    elif device.needs_to_stop_charging():
+    elif device.needs_to_stop_charging() and not device.decommissioned:
         device.stop_charging()
+    elif device.decommissioned: # if the device is behaving badly, stop charging it.
+        device.stop_charging() 
 
     return jsonify(success=True)
 
@@ -174,11 +340,8 @@ def handle_phone_response(data):
 
     print (f"Device id={device_id} has acknowledged job id={job_id}")
 
+
 if __name__ == '__main__':
     # app.run(host="0.0.0.0")
-<<<<<<< HEAD
-    checker.run()
-    socketio.run(app, host='0.0.0.0')
-=======
-    socketio.run(app, host='0.0.0.0', debug=True)
->>>>>>> main
+    socketio.run(app, host='0.0.0.0', debug=False)
+    # socketio.run(app, host='0.0.0.0', debug=True)
