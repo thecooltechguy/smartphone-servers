@@ -120,7 +120,7 @@ class Checker:
                 if device.num_failed_acks + device.num_failed_jobs > MAX_FAILS and not device.decommissioned:
                     device.stop_charging()
                     device.decommission()
-                    print(f"[DEVICE {device.id} DECOMMISSIONED.")
+                    print(f"[DEVICE {device.id}] DECOMMISSIONED.")
 
             # Start another thread in a min
             # threading.Timer(db.HEARTBEAT_ACTIVE_RANGE_MINUTES * 60, self.check_phones).start()
@@ -149,9 +149,9 @@ class Checker:
         # Reschedule the job for another device, if and only if the number of retries don't go past 3.
         if job.can_be_retried:
             if(schedule_job(job)):
-                print(f"[JOB {job.id} RESCHEDULED]")
+                print(f"[JOB {job.id}] Rescheduled")
         else:
-            print(f"[JOB {job.id} HIT RESCHEDULE LIMIT]")
+            print(f"[JOB {job.id}] Reschedule Limit Hit")
 
 checker = Checker()
 
