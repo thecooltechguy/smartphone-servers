@@ -196,7 +196,7 @@ def get_target_device_for_job():
     # TODO: This logic would of course change once we begin to account for cpus/mem, at which point,
     #  the device selection query would select all devices that have enough resources to run this job, etc.
     candidate_devices_for_job = get_devices_not_currently_in_use()
-    candidate_devices_for_job = [device for device in candidate_devices_for_job if (not device.is_active and not device.decommissioned)]
+    candidate_devices_for_job = [device for device in candidate_devices_for_job if (device.is_active and not device.decommissioned)]
     candidate_devices_for_job = sorted(candidate_devices_for_job, key = lambda device: device.get_avg_historical_system_metric(metric_name="cpu"))
     if not candidate_devices_for_job:
         return None

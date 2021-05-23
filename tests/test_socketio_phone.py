@@ -1,7 +1,6 @@
 import socketio
 import requests
 import time
-import random
 
 SERVER_ENDPOINT = "http://localhost:5000"
 device_id = 0 # 0 is reserved for testing, real phones would use ids >= 1
