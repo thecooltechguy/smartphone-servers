@@ -10,4 +10,4 @@ Our mid-semester demo videos can be found here:
 2. Power management demo -- https://youtu.be/Mx6LJpP9_fM
 
 ### Documentation
-Documentation can be found in the wiki.
+Documentation, including guidelines for reproducing our work, can be found in the wiki.
