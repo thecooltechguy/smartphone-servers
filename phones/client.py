@@ -36,22 +36,21 @@ def task_submission(data):
     print(data['job'])
 
     # process the task from git repo
-    # TODO: process more complicated tasks
     process_git_task(data['job']['code_url'])
 
-    # TODO: have more logic in terms of catching and handling errors, and process results
     result = ""
     with open("./output", "r") as f:
         result += f.readline()
     
-    print(result)
-
     time.sleep(5)
 
+    status = 0
+    with open("./status", "r") as f:
+        status = int(f.readline())
+
     # Once the job succeeds/fails, notify the server
-    status = STATUS_SUCCEDED # or, STATUS_FAILED
+    status = STATUS_SUCCEDED if status == 0 else STATUS_FAILED
     
-    # TODO: how do we return the response
     resp = requests.post("{}/jobs/{}/update_status/".format(SERVER_ENDPOINT, job_id), json={"device_id" : device_id, "status" : status, "result" : result}).json()
 
     print("Response from notifying server of job status: {}".format(status))
@@ -62,8 +61,10 @@ def process_git_task(url):
     os.system('git clone {}'.format(url))
     # get the directory
     directory = url.split('/')[-1].replace('.git', '')
-    # run the file and store in a output file
+    # run the file and store in a file
     os.system('./{}/main.sh > ./output'.format(directory))
+    # check the exit code and store in a file
+    os.system('echo $? > ./status')
     # remove the git repo
     os.system('rm -rf {}'.format(directory))
 
