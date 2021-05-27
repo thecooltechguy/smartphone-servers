@@ -253,6 +253,8 @@ def job_update_status(job_id):
     device_id = body['device_id']
     status = body['status']
 
+    result = body.get("result")
+
     device = db.get_device(device_id)
     if not device:
         return jsonify(success=False, error_code="INVALID_DEVICE_ID"), 400
@@ -272,6 +274,10 @@ def job_update_status(job_id):
     if status == db.Job.SUCCEEDED or status == db.Job.FAILED:
         # This job has finished, so it's no longer assigned to a device
         job.assigned_device = None
+
+        if result:
+            print(f"Received result for job id {job_id}:")
+            print(result)
 
     job.save()
     return jsonify(success=True)
