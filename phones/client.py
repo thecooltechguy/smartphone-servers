@@ -51,7 +51,7 @@ def task_submission(data):
     # Once the job succeeds/fails, notify the server
     status = STATUS_SUCCEDED if status == 0 else STATUS_FAILED
     
-    resp = requests.post("{}/jobs/{}/update_status/".format(SERVER_ENDPOINT, job_id), json={"device_id" : device_id, "status" : status, "result" : result}).json()
+    resp = requests.post(f"{SERVER_ENDPOINT}/jobs/{job_id}/update_status/", json={"device_id" : device_id, "status" : status, "result" : result}).json()
 
     print("Response from notifying server of job status: {}".format(status))
     print(resp)
@@ -68,5 +68,5 @@ def process_git_task(url):
     # remove the git repo
     os.system('rm -rf {}'.format(directory))
 
-sio.connect(f"http://{SERVER_ENDPOINT}/?device_id={device_id}")
+sio.connect(f"{SERVER_ENDPOINT}/?device_id={device_id}")
 sio.wait()
