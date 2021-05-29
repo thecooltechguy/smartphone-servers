@@ -22,7 +22,7 @@ STATUS_CODE_MESSAGES = {
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Submit a job to our smartphone datacenter.')
-    parser.add_argument('--code_url', help='The github repo to run')
+    parser.add_argument('--code_url', help='The github repo to run', required=True)
     parser.add_argument("--cpus", default=-1, help="The amount of CPUs required for the job")
     parser.add_argument("--memory_mb", default=-1, help="The amount of memory (MB) required for the job")
     parser.add_argument("--max_runtime_secs", default=30, help="The maximum runtime for this job (in seconds)")
@@ -78,6 +78,7 @@ if __name__ == "__main__":
                     # the job has succeeded
                     spinner.stop_and_persist(symbol='🦄'.encode('utf-8'), text=STATUS_CODE_MESSAGES[new_job_status_code])
                     break
+                job_status_code = new_job_status_code
             time.sleep(JOB_STATUS_POLL_INTERVAL_SECS)
         except (KeyboardInterrupt, SystemExit):
             spinner.stop()

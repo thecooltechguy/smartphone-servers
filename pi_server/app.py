@@ -277,8 +277,8 @@ def job_update_status(job_id):
         job.assigned_device = None
 
         if result:
-            print(f"Received result for job id {job_id}:")
-            print(result)
+            print(f"\n\n[JOB RESULT] Received output for job id {job_id}:")
+            print(result, "\n\n")
 
     job.save()
     return jsonify(success=True)
