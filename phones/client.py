@@ -68,5 +68,5 @@ def process_git_task(url):
     # remove the git repo
     os.system('rm -rf {}'.format(directory))
 
-sio.connect('http://127.0.0.1:5000/?device_id={}'.format(device_id))
+sio.connect(f"http://{SERVER_ENDPOINT}/?device_id={device_id}")
 sio.wait()

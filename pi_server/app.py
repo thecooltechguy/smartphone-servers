@@ -304,6 +304,7 @@ def test_connect():
     device = db.get_device(device_id=device_id)
     if not device:
         # Unknown device tried to connect
+        print ("Rejecting unknown device connection")
         return False
     print(f"Device id={device_id} has connected")
 
