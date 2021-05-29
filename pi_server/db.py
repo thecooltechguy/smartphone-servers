@@ -115,6 +115,8 @@ class Job(BaseModel):
     FAILED = 2
     SUCCEEDED = 3
 
+    STATUS_CODES = ["UNASSIGNED", "ASSIGNED", "FAILED", "SUCCEEDED"]
+
     num_attempts = IntegerField(default=0)
 
     status = IntegerField(choices=[(UNASSIGNED, "UNASSIGNED"), (ASSIGNED, "ASSIGNED"), (FAILED, "FAILED"), (SUCCEEDED, "SUCCESS")], default=0)

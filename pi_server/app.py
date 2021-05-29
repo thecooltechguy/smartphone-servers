@@ -9,22 +9,16 @@ from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO, send, emit
 
-
-
 app = Flask(__name__)
 app.config['SECRET_KEY'] = "actualsecret"
 socketio = SocketIO(app)
 
 import db
 
-
 # For the Checker class
 import threading
 from datetime import timedelta
-import datetime
 import time
-
-
 
 # ============== BEGINNING OF CHECKER CODE ============== #
 # Checker Chron
@@ -57,9 +51,9 @@ class Checker:
 
                 # Check if job timed out, if so then try to cancel it and reschedule it.
                 if job_max_secs > 0 and job_json["status"] == job.ASSIGNED and job_json["assigned_device_id"] is not None:
-                    time_updated = datetime.datetime.strptime(job_json["time_updated"], '%Y-%m-%d %H:%M:%S.%f')
+                    time_updated = datetime.strptime(job_json["time_updated"], '%Y-%m-%d %H:%M:%S.%f')
                     timeout_datetime = timedelta(seconds = job_max_secs) + time_updated
-                    if timeout_datetime < datetime.datetime.utcnow():
+                    if timeout_datetime < datetime.utcnow():
 
                         # update device's num_failed_jobs
                         device = db.get_device(job_json["assigned_device_id"])
@@ -73,11 +67,10 @@ class Checker:
 
                 # For unassigned jobs.
                 if job_json["status"] == job.UNASSIGNED:
-                    
                     # Check if the phone has not acknowledged the job for 10 seconds. If so, then increase the num_failed_acks and reschedule the job
-                    time_updated = datetime.datetime.strptime(job_json["time_updated"], '%Y-%m-%d %H:%M:%S.%f')
+                    time_updated = datetime.strptime(job_json["time_updated"], '%Y-%m-%d %H:%M:%S.%f')
                     timeout_datetime = timedelta(seconds = ACK_TIMEOUT) + time_updated
-                    if timeout_datetime < datetime.datetime.utcnow() and job.id in self.pending_job_acks:
+                    if timeout_datetime < datetime.utcnow() and job.id in self.pending_job_acks:
 
                         # update device's num_failed_acks
                         device = db.get_device(self.pending_job_acks[job.id])
@@ -88,13 +81,13 @@ class Checker:
 
                         self.remove_pending_acknowledgement(job.id)
                         self.cancel_and_reschedule_job(job.id)
-                    
+
                     # For jobs that are just unassigned in general, hence there is no pending ack's:
-                    elif job.id not in self.pending_job_acks and job.can_be_retried: 
+                    elif job.id not in self.pending_job_acks and job.can_be_retried:
                         schedule_job(job)
 
                 # For failed jobs: retry them.
-                if job_json["status"] == job.FAILED and job.can_be_retried:     
+                if job_json["status"] == job.FAILED and job.can_be_retried:
                     schedule_job(job)
 
 
@@ -104,12 +97,12 @@ class Checker:
             # threading.Timer(CHECK_JOBS_INTERVAL_SEC, self.check_jobs).start()
             time.sleep(CHECK_JOBS_INTERVAL_SEC)
 
-            
+
     def check_phones(self):
         if self.stopped:
             # stops recursively generating threads.
             return
-        
+
         while not self.stopped:
             print("[CHECKING PHONES]")
 
@@ -125,18 +118,18 @@ class Checker:
             # Start another thread in a min
             # threading.Timer(db.HEARTBEAT_ACTIVE_RANGE_MINUTES * 60, self.check_phones).start()
             time.sleep(db.HEARTBEAT_ACTIVE_RANGE_MINUTES * 60)
-                
+
 
     def stop(self):
         self.stopped = True
 
     def add_pending_acknowledgement(self, job_id, device_id):
         self.pending_job_acks[job_id] = device_id
-    
+
     def remove_pending_acknowledgement(self, job_id):
         if job_id in self.pending_job_acks:
             del self.pending_job_acks[job_id]
-    
+
     def cancel_and_reschedule_job(self, job_id):
         job = db.get_job(job_id)
         job_json = job.to_json()
@@ -154,7 +147,6 @@ class Checker:
             print(f"[JOB {job.id}] Reschedule Limit Hit")
 
 checker = Checker()
-
 
 eventlet.spawn(checker.check_jobs)
 eventlet.spawn(checker.check_phones)
@@ -242,6 +234,15 @@ def job_submit():
         return jsonify(success=False, error_code="NO_DEVICES_ARE_AVAILABLE"), 500
 
     return jsonify(success=True, job_id=job.id)
+
+@app.route("/jobs/<int:job_id>/status/")
+def job_status(job_id):
+    job = db.get_job(job_id)
+    if not job:
+        return jsonify(success=False, error_code="INVALID_JOB_ID"), 400
+
+    status_code = db.Job.STATUS_CODES[job.status]
+    return jsonify(success=True, status_code=status_code)
 
 @app.route("/jobs/<int:job_id>/update_status/", methods=['POST'])
 def job_update_status(job_id):
