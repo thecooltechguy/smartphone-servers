@@ -2,9 +2,10 @@ import requests
 import time
 import threading
 import util
+import sys
 
 HEARTBEAT_INTERVAL_SECS = 5
-SERVER_ENDPOINT = "http://localhost:5000"
+SERVER_ENDPOINT = sys.argv[1] #"http://localhost:5000"
 
 # get the device id (should already exist on the phone)
 with open("./id.txt", "r") as f:
