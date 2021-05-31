@@ -1,11 +1,12 @@
 import sys
 import time
+import pandas as pd
 import requests, argparse
 from halo import Halo
 
 JOB_STATUS_POLL_INTERVAL_SECS = 5
 
-SERVER_ENDPOINT = "http://localhost:5000"
+SERVER_ENDPOINT = "http://192.168.1.30:5000"
 submit_job_url = f"{SERVER_ENDPOINT}/jobs/submit/"
 
 def get_job_status(job_id):
@@ -19,20 +20,7 @@ STATUS_CODE_MESSAGES = {
     "FAILED" : "The job has failed.",
     "SUCCEEDED" : "The job has succeeded!"
 }
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Submit a job to our smartphone datacenter.')
-    parser.add_argument('--code_url', help='The github repo to run', required=True)
-    parser.add_argument("--cpus", default=-1, help="The amount of CPUs required for the job")
-    parser.add_argument("--memory_mb", default=-1, help="The amount of memory (MB) required for the job")
-    parser.add_argument("--max_runtime_secs", default=30, help="The maximum runtime for this job (in seconds)")
-    args = parser.parse_args()
-
-    code_url = args.code_url
-    cpus = args.cpus
-    memory_mb = args.memory_mb
-    max_runtime_secs = args.max_runtime_secs
-
+def submit_job(code_url, cpus, memory_mb, max_runtime_secs):
     job_spec = {
         "code_url": code_url,
 
@@ -83,3 +71,15 @@ if __name__ == "__main__":
         except (KeyboardInterrupt, SystemExit):
             spinner.stop()
             break
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Submit a list of jobs to our smartphone datacenter.')
+    parser.add_argument('--jobs', help='The CSV file that contains the list of jobs', required=True)
+    args = parser.parse_args()
+
+    fn = args.jobs
+    df = pd.read_csv(fn)
+    for row in df.iterrows():
+        row = row[1]
+        submit_job(row['code_url'],row['cpus'],row['memory_mb'],row['max_runtime_secs'])
+
