@@ -4,7 +4,7 @@ import requests
 import os
 import sys
 
-SERVER_ENDPOINT = sys.argv[1] #"http://localhost:5000"
+SERVER_ENDPOINT = "http://192.168.1.30:5000"
 STATUS_FAILED = 2
 STATUS_SUCCEDED = 3
 
